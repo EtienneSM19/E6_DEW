@@ -4,58 +4,59 @@ const taskName = document.querySelector('h3');
 const description = document.querySelector('p');
 const taskCountSpan = document.getElementById('taskCount');
 const totalHoursSpan = document.getElementById('totalHours');
-const showTasksButton = document.getElementById('showTasks');
+let showTasksButton = document.getElementById('showTasks');
 const tasksList = document.getElementById('tasksList');
-const deleteProjectButton = document.getElementById('deleteProject');
+let deleteProjectButton = document.getElementById('deleteProject');
 
-async function loadAllProjects(){
+let projectById = null;
+
+function loadAllProjects() {
   try {
-    const response = await fetch('/api/project');
-    if(!response.ok) {
-      throw new Error('Error al cargar los proyectos ' + response.status);
-    }
-
-    let projects = await response.json();
-
-    [...projects].forEach(project => {
-      let li = document.createElement('li');
-      li.textContent = project.name;
-      li.addEventListener('click', () => loadProjectDetails(project));
-      li.id = project.id;
-      projectList.append(li);
-    })
-    
-  } catch(e) {
+    fetch('/api/project')
+      .then(response => response.json())
+      .then(projects => {
+        projectList.innerHTML = '';
+        [...projects].forEach(project => {
+          let li = document.createElement('li');
+          li.textContent = project.name;
+          li.dataset.id = project.id;
+          projectList.append(li);
+          li.addEventListener('click', () => loadProjectDetails(project));
+        })
+      })
+  } catch (e) {
     console.error('Error al cargar todos los proyectos ' + e);
   }
 }
 
 
 async function loadProjectDetails(project) {
-  try {
-    const response = await fetch('/api/project/'+ project.id);
-    if(!response.ok){
-      throw new Error('Error al mostrar detalles del proyecto' + response.status);
-    }
-    const projectById = await response.json();
-    taskName.textContent = projectById.name;
-    description.textContent = projectById.description;
-    taskCountSpan.textContent = projectById.taskCount;
-    totalHoursSpan.textContent = projectById.totalHours;
-    detailProject.className = '';
-    showTasksButton.addEventListener('click', () => showTasks(project.id))
-    deleteProjectButton.addEventListener('click', () => deleteProject(project.id));
-  } catch(e) {
-    console.error('Error al mostrar detalles del proyecto '+ e);
+  const response = await fetch('/api/project/' + project.id);
+  if (!response.ok) {
+    throw new Error('Error al mostrar detalles del proyecto' + response.status);
   }
-}
+  projectById = await response.json();
+  taskName.textContent = projectById.name;
+  description.textContent = projectById.description;
+  taskCountSpan.textContent = projectById.taskCount;
+  totalHoursSpan.textContent = projectById.totalHours;
+  detailProject.className = '';
 
-async function showTasks(projectId) {
-  try {
-    const response = await fetch('/api/project/'+projectId+'/task');
-    if(!response.ok){
+  const newShowTasksButton = showTasksButton.cloneNode(true);
+  showTasksButton.parentNode.replaceChild(newShowTasksButton, showTasksButton);
+  showTasksButton = newShowTasksButton;
+
+  const newDeleteProjectButton = deleteProjectButton.cloneNode(true);
+  deleteProjectButton.parentNode.replaceChild(newDeleteProjectButton, deleteProjectButton);
+  deleteProjectButton = newDeleteProjectButton;
+
+  showTasksButton.addEventListener('click', async () => {
+
+    const response = await fetch('/api/project/' + projectById.id + '/task');
+    if (!response.ok) {
       throw new Error('Error al mostrar las tareas ' + response.status);
     }
+    console.log(projectById.id);
     const tasks = await response.json();
     tasksList.innerHTML = ''
     tasks.forEach(task => {
@@ -63,24 +64,20 @@ async function showTasks(projectId) {
       li.textContent = task.concept + ' | ' + task.duration;
       tasksList.append(li);
     })
-  }
-  catch(e){
-    console.error('Error al mostrar las tareas ' + e);
-  }
-}
+  })
 
-async function deleteProject(projectId) {
-  try {
-    const response = await fetch('/api/project/'+projectId)
-    if(!response.ok){
-      throw new Error('Error al borrar el proyecto ' + response.status);
-    }
-    
-    const deleter = await response.json();
-    console.log(deleter);
-  } catch(e) {
-    console.error('Error al borrar el proyecto ' + e);
-  }
-}
+  deleteProjectButton.addEventListener('click', async () => {
+    await fetch('/api/project/' + projectById.id, {method: 'DELETE'})
+    .then(response => {
+      if (!response.ok) {
+        alert('El proyecto con id ' + projectById.id + ' tiene tareas asociadas');
+      } else {
+        detailProject.className = 'hidden';
+        projectList.querySelector(`li[data-id="${projectById.id}"]`).remove();
+        loadAllProjects();
+      }
+    })
+  });
 
+}
 loadAllProjects();
